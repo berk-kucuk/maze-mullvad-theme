@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# tool caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# generate.py output (default ./build) and makepkg output (build-pkg.sh)
+build/
+dist-pkg/
+*.pkg.tar.*
+*.src.tar.*
+pkg/
+src/
+
+# Mullvad's archive must never be committed (copies made while testing)
+*.asar
+*.asar.orig
+
+# editors / OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# local tooling
+.claude/
+*.log
+
+# secrets that must never be committed
+.env
+.env.*
+*.pem
+*.p12
+*.key
+*.gpg

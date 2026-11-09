@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = mullvad-vpn
+
+[Action]
+Description = Applying Maze tray icons to Mullvad VPN...
+When = PostTransaction
+Exec = /usr/lib/maze-mullvad-theme/apply

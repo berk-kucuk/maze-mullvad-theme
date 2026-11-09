@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# maze-mullvad-theme apply — Mullvad'a Maze gorunumunu uygular:
+#   * app.asar: tray ikonlari ve siyah (#0b0b0b) arayuz temasi (patch_asar.py, theme.py)
+#   * hicolor/<boyut>/apps/mullvad-vpn.png: pencere ve uygulama menusu ikonu
+#
+# Root olarak calisir: paket kurulunca/guncellenince (.install) ve mullvad-vpn
+# her kurulup guncellendiginde (pacman hook) cagrilir. Mullvad'in kendi
+# dosyalarinin temiz kopyalari /var/lib/maze-mullvad-theme altinda tutulur;
+# restore bunlarla geri yukler. /etc/maze-mullvad-theme.conf icinde THEME=0
+# olursa arayuz temasi atlanir, sadece ikonlar uygulanir.
+set -euo pipefail
+LIB="${MMT_LIB:-/usr/lib/maze-mullvad-theme}"
+SHARE="${MMT_SHARE:-/usr/share/maze-mullvad-theme}"
+ICONS="${MMT_ICONS:-$SHARE/icons}"
+STATE="${MMT_STATE:-/var/lib/maze-mullvad-theme}"
+ASAR="${MMT_ASAR:-/usr/lib/mullvad-vpn/app.asar}"
+HICOLOR="${MMT_HICOLOR:-/usr/share/icons/hicolor}"
+CONF="${MMT_CONF:-/etc/maze-mullvad-theme.conf}"
+
+THEME=1
+# shellcheck disable=SC1090
+[[ -f "$CONF" ]] && . "$CONF"
+
+[[ -f "$ASAR" ]] || { echo "maze-mullvad-theme: $ASAR yok, atlaniyor"; exit 0; }
+install -dm755 "$STATE"
+
+# Bir Mullvad dosyasini bizim surumuyle degistirir. Yerindeki dosya zaten bizimse
+# yedegin uzerine yazmaz, yoksa orijinal kaybolur.
+backup_if_theirs() {  # <dosya> <yedek> <bizim hash dosyamiz>
+    local file="$1" orig="$2" ours="$3"
+    if [[ ! -f "$ours" || "$(sha256sum "$file" | cut -d' ' -f1)" != "$(cat "$ours")" ]]; then
+        install -Dm644 "$file" "$orig"
+    fi
+}
+
+# ── Pencere / menu ikonu ──────────────────────────────────────────────────────
+if [[ -d "$SHARE/appicon" ]]; then
+    for png in "$SHARE"/appicon/*.png; do
+        size="$(basename "$png" .png)"
+        target="$HICOLOR/${size}x${size}/apps/mullvad-vpn.png"
+        [[ -f "$target" ]] || continue
+        backup_if_theirs "$target" "$STATE/hicolor/${size}.png.orig" "$STATE/hicolor/${size}.sha256"
+        install -m644 "$png" "$target"
+        sha256sum "$target" | cut -d' ' -f1 > "$STATE/hicolor/${size}.sha256"
+    done
+    command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -qtf "$HICOLOR" 2>/dev/null || true
+fi
+
+# ── app.asar: tray ikonlari + tema ────────────────────────────────────────────
+backup_if_theirs "$ASAR" "$STATE/app.asar.orig" "$STATE/patched.sha256"
+
+args=()
+[[ "$THEME" == 0 ]] && args+=(--no-theme)
+tmp="$(mktemp "$ASAR.XXXXXX")"
+trap 'rm -f "$tmp"' EXIT
+if ! python3 "$LIB/patch_asar.py" "$STATE/app.asar.orig" "$ICONS" "$tmp" "${args[@]}"; then
+    # Mullvad arsiv yapisini ya da ikon adlarini degistirmis olabilir:
+    # orijinale dokunmadan cik, Mullvad kendi gorunumuyle calismaya devam eder.
+    echo "maze-mullvad-theme: app.asar yamalanamadi, Mullvad'in orijinal gorunumu kaldi" >&2
+    exit 0
+fi
+chmod 644 "$tmp"
+sha256sum "$tmp" | cut -d' ' -f1 > "$STATE/patched.sha256"
+mv -f "$tmp" "$ASAR"
+trap - EXIT
+echo "maze-mullvad-theme: uygulandi (Mullvad arayuzunu yeniden baslat)"

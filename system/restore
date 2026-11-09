@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# maze-mullvad-theme restore — Mullvad'in orijinal app.asar'ini ve uygulama
+# ikonlarini geri yukler. Paket kaldirilirken (.install pre_remove) root olarak
+# cagrilir. Bir dosya artik bizim surumumuz degilse (arada Mullvad guncellendiyse)
+# yerindeki zaten temizdir ve dokunulmaz.
+set -euo pipefail
+STATE="${MMT_STATE:-/var/lib/maze-mullvad-theme}"
+ASAR="${MMT_ASAR:-/usr/lib/mullvad-vpn/app.asar}"
+HICOLOR="${MMT_HICOLOR:-/usr/share/icons/hicolor}"
+
+restore_if_ours() {  # <dosya> <yedek> <bizim hash dosyamiz>
+    local file="$1" orig="$2" ours="$3"
+    [[ -f "$file" && -f "$orig" && -f "$ours" ]] || return 0
+    if [[ "$(sha256sum "$file" | cut -d' ' -f1)" == "$(cat "$ours")" ]]; then
+        install -m644 "$orig" "$file"
+    fi
+}
+
+restore_if_ours "$ASAR" "$STATE/app.asar.orig" "$STATE/patched.sha256"
+
+if [[ -d "$STATE/hicolor" ]]; then
+    for orig in "$STATE"/hicolor/*.png.orig; do
+        [[ -e "$orig" ]] || continue
+        size="$(basename "$orig" .png.orig)"
+        restore_if_ours "$HICOLOR/${size}x${size}/apps/mullvad-vpn.png" "$orig" "$STATE/hicolor/${size}.sha256"
+    done
+    command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -qtf "$HICOLOR" 2>/dev/null || true
+fi
+echo "maze-mullvad-theme: Mullvad'in orijinal gorunumu geri yuklendi"

@@ -1,0 +1,16 @@
+post_install() {
+    /usr/lib/maze-mullvad-theme/apply
+}
+
+post_upgrade() {
+    # New icons in this release: re-apply over Mullvad's clean archive.
+    /usr/lib/maze-mullvad-theme/apply
+}
+
+pre_remove() {
+    /usr/lib/maze-mullvad-theme/restore
+}
+
+post_remove() {
+    rm -rf /var/lib/maze-mullvad-theme
+}
