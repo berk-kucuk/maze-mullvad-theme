@@ -86,6 +86,12 @@ installed `mullvad-vpn` package:
 `pacman -Qkk mullvad-vpn` reports `app.asar` and the icons as modified while this
 package is installed; that is expected.
 
+The theme only swaps Mullvad's navy shades for grays. It hides nothing and
+never touches the red, green and yellow of the status display ("unsecured",
+"blocked", "connected"): a test reads those colours out of the installed
+Mullvad and checks every one of them survives the patch unchanged. The VPN
+itself (the daemon) is never touched.
+
 ## Development
 
 | File | What it is |

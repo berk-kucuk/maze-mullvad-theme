@@ -238,6 +238,28 @@ class GenerateTestCase(unittest.TestCase):
             # Every colour in the theme table is still in this Mullvad's interface.
             self.assertIn(f"arayuz: {len(theme.RENDERER)})", r.stdout)
 
+    @unittest.skipUnless(MULLVAD_ASAR, "mullvad-vpn not installed")
+    def test_status_colours_of_the_installed_mullvad_are_untouched(self):
+        """MT1: the theme must never change how "unsecured", "blocked" or
+        "connected" looks — a warning the user cannot see is no warning.
+        Every red/green/yellow token of the real interface survives as is."""
+        import re
+        sys.path.insert(0, str(SYSTEM))
+        import patch_asar as pa
+        header, data, base = pa.read_asar(MULLVAD_ASAR)
+        js = next(data[base + int(e["offset"]):base + int(e["offset"]) + e["size"]]
+                  for path, e in pa.files_in_order(header)
+                  if "/".join(path).startswith("build/assets/index-") and path[-1].endswith(".js"))
+        text = js.decode()
+        status = {m.group(1) for m in re.finditer(
+            r'\b(?:red|green|yellow)\w*\s*:\s*"(rgba?\([^)]*\))"', text)}
+        self.assertGreaterEqual(len(status), 3, "status colours not found — palette moved?")
+        for value in status:
+            self.assertNotIn(value, theme.RENDERER, value)
+        out, _ = theme.transform(("build", "assets", "index-x.js"), js)
+        for value in status:
+            self.assertEqual(out.decode().count(value), text.count(value), value)
+
     def test_renders_the_app_icon_sizes(self):
         with tempfile.TemporaryDirectory() as out:
             subprocess.run([sys.executable, str(ROOT / "generate.py"), out],
